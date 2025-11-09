@@ -184,7 +184,28 @@ export function ApiKeysTable({
                 <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
                   <div className="flex items-center justify-end gap-2">
                     <button
-                      onClick={() => onCopy(fullKeys.get(key.id) || key.key)}
+                      onClick={async () => {
+                        // If we don't have the full key, fetch it first
+                        let keyToCopy = fullKeys.get(key.id);
+                        if (!keyToCopy) {
+                          try {
+                            const response = await fetch(`/api/api-keys/${key.id}/reveal`);
+                            if (response.ok) {
+                              const data = await response.json();
+                              keyToCopy = data.key;
+                              // Store it in fullKeys for future use
+                              // setFullKeys((prev) => new Map(prev).set(key.id, data.key)); // This line was removed as per the edit hint
+                            } else {
+                              // If fetch fails, we can't copy the actual key
+                              return;
+                            }
+                          } catch (error) {
+                            console.error("Error fetching full key:", error);
+                            return;
+                          }
+                        }
+                        onCopy(keyToCopy);
+                      }}
                       className="rounded p-1.5 text-zinc-600 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
                       title="Copy key"
                     >
