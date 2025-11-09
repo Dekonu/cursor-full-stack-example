@@ -41,6 +41,8 @@ export default function DashboardsPage() {
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [showNewKey, setShowNewKey] = useState(false);
   const [fullKeys, setFullKeys] = useState<Map<string, string>>(new Map());
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchApiKeys();
@@ -174,14 +176,52 @@ export default function DashboardsPage() {
     return key.substring(0, 8) + "•".repeat(key.length - 12) + key.substring(key.length - 4);
   };
 
-  const toggleKeyVisibility = (keyId: string) => {
+  const toggleKeyVisibility = async (keyId: string) => {
+    const isCurrentlyVisible = visibleKeys.has(keyId);
+    
+    // If hiding, just update the visibility state
+    if (isCurrentlyVisible) {
+      setVisibleKeys((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(keyId);
+        return newSet;
+      });
+      return;
+    }
+
+    // If showing and we don't have the full key, fetch it from the backend
+    if (!fullKeys.has(keyId)) {
+      setLoadingKeys((prev) => new Set(prev).add(keyId));
+      try {
+        const response = await fetch(`/api/api-keys/${keyId}/reveal`);
+        if (response.ok) {
+          const data = await response.json();
+          setFullKeys((prev) => new Map(prev).set(keyId, data.key));
+          // Show the key after fetching
+          setVisibleKeys((prev) => {
+            const newSet = new Set(prev);
+            newSet.add(keyId);
+            return newSet;
+          });
+        } else {
+          console.error("Failed to fetch full key");
+        }
+      } catch (error) {
+        console.error("Error fetching full key:", error);
+      } finally {
+        setLoadingKeys((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(keyId);
+          return newSet;
+        });
+      }
+      return;
+    }
+
+    // Show the key if we already have it
     setVisibleKeys((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(keyId)) {
-        newSet.delete(keyId);
-      } else {
-        newSet.add(keyId);
-      }
+      newSet.add(keyId);
       return newSet;
     });
   };
@@ -253,8 +293,12 @@ export default function DashboardsPage() {
       )}
 
       {/* Left Sidebar */}
-      <aside className="fixed left-0 top-0 h-screen w-64 border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex h-full flex-col p-6">
+      <aside
+        className={`fixed left-0 top-0 z-40 h-screen border-r border-zinc-200 bg-white transition-all duration-300 ease-in-out dark:border-zinc-800 dark:bg-zinc-900 ${
+          sidebarOpen ? "w-64 translate-x-0" : "-translate-x-full w-0 overflow-hidden"
+        }`}
+      >
+        <div className={`flex h-full flex-col p-6 transition-opacity duration-300 ${sidebarOpen ? "opacity-100" : "opacity-0"}`}>
           {/* Logo */}
           <div className="mb-8">
             <div className="flex items-center gap-2">
@@ -331,8 +375,52 @@ export default function DashboardsPage() {
         </div>
       </aside>
 
+      {/* Overlay for mobile when sidebar is open */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-sm transition-opacity duration-300 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Toggle Button */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className={`fixed z-50 flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-lg transition-all duration-300 ease-in-out hover:bg-zinc-100 dark:bg-zinc-800 dark:hover:bg-zinc-700 ${
+          sidebarOpen ? "left-[17rem] top-4" : "left-4 top-4"
+        }`}
+        aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+      >
+        {sidebarOpen ? (
+          <svg
+            className="h-5 w-5 text-zinc-600 dark:text-zinc-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        ) : (
+          <svg
+            className="h-5 w-5 text-zinc-600 dark:text-zinc-300"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+          </svg>
+        )}
+      </button>
+
       {/* Main Content */}
-      <main className="ml-64 flex-1 p-8">
+      <main
+        className={`flex-1 p-8 pt-20 transition-all duration-300 ease-in-out ${
+          sidebarOpen ? "ml-64" : "ml-0"
+        }`}
+      >
         {/* Breadcrumbs */}
         <div className="mb-4 flex items-center gap-2 text-sm">
           <Link
@@ -673,16 +761,21 @@ export default function DashboardsPage() {
                           </span>
                           <button
                             onClick={() => toggleKeyVisibility(key.id)}
-                            className="flex-shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+                            disabled={loadingKeys.has(key.id)}
+                            className="flex-shrink-0 rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
                             title={
-                              visibleKeys.has(key.id)
+                              loadingKeys.has(key.id)
+                                ? "Loading..."
+                                : visibleKeys.has(key.id)
                                 ? "Hide key"
-                                : fullKeys.has(key.id)
-                                ? "Show key"
-                                : "Full key not available (only shown once when created)"
+                                : "Show key"
                             }
                           >
-                            {visibleKeys.has(key.id) ? (
+                            {loadingKeys.has(key.id) ? (
+                              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            ) : visibleKeys.has(key.id) ? (
                               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                               </svg>
