@@ -3,7 +3,7 @@ import * as storage from "@/lib/api-keys-storage";
 
 // GET - List all API keys
 export async function GET() {
-  const apiKeys = storage.getAllApiKeys();
+  const apiKeys = await storage.getAllApiKeys();
   return NextResponse.json(apiKeys);
 }
 
@@ -11,18 +11,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, key } = body;
+    const { name } = body;
 
-    if (!name || !key) {
+    if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
-        { error: "Name and key are required" },
+        { error: "Name is required and must be a non-empty string" },
         { status: 400 }
       );
     }
 
-    const newApiKey = storage.createApiKey(name, key);
+    const newApiKey = await storage.createApiKey(name.trim());
     return NextResponse.json(newApiKey, { status: 201 });
   } catch (error) {
+    console.error("Error creating API key:", error);
     return NextResponse.json(
       { error: "Failed to create API key" },
       { status: 500 }
