@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ApiMetrics } from "../types";
+import { apiClient } from "@/lib/api-client";
 
 export function useMetrics() {
   const [metrics, setMetrics] = useState<ApiMetrics>({
@@ -13,11 +14,8 @@ export function useMetrics() {
 
   const fetchMetrics = async () => {
     try {
-      const response = await fetch("/api/metrics");
-      if (response.ok) {
-        const data = await response.json();
-        setMetrics(data);
-      }
+      const data = await apiClient.getMetrics();
+      setMetrics(data);
     } catch (error) {
       console.error("Failed to fetch metrics:", error);
     } finally {

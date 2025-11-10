@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import type { ApiKey } from "../types";
+import { apiClient } from "@/lib/api-client";
 
 export function useApiKeys() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -10,11 +11,8 @@ export function useApiKeys() {
 
   const fetchApiKeys = async () => {
     try {
-      const response = await fetch("/api/api-keys");
-      if (response.ok) {
-        const data = await response.json();
-        setApiKeys(data);
-      }
+      const data = await apiClient.getAllApiKeys();
+      setApiKeys(data);
     } catch (error) {
       console.error("Failed to fetch API keys:", error);
     } finally {
@@ -43,19 +41,14 @@ export function useApiKeys() {
     if (!fullKeys.has(keyId)) {
       setLoadingKeys((prev) => new Set(prev).add(keyId));
       try {
-        const response = await fetch(`/api/api-keys/${keyId}/reveal`);
-        if (response.ok) {
-          const data = await response.json();
-          setFullKeys((prev) => new Map(prev).set(keyId, data.key));
-          // Show the key after fetching
-          setVisibleKeys((prev) => {
-            const newSet = new Set(prev);
-            newSet.add(keyId);
-            return newSet;
-          });
-        } else {
-          console.error("Failed to fetch full key");
-        }
+        const data = await apiClient.revealApiKey(keyId);
+        setFullKeys((prev) => new Map(prev).set(keyId, data.key));
+        // Show the key after fetching
+        setVisibleKeys((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(keyId);
+          return newSet;
+        });
       } catch (error) {
         console.error("Error fetching full key:", error);
       } finally {
@@ -77,42 +70,37 @@ export function useApiKeys() {
   };
 
   const createApiKey = async (name: string) => {
-    const response = await fetch("/api/api-keys", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (response.ok) {
-      const createdKey = await response.json();
+    try {
+      const createdKey = await apiClient.createApiKey(name);
       setFullKeys((prev) => new Map(prev).set(createdKey.id, createdKey.key));
       await fetchApiKeys();
       return createdKey;
+    } catch (error) {
+      console.error("Failed to create API key:", error);
+      throw new Error("Failed to create API key");
     }
-    throw new Error("Failed to create API key");
   };
 
   const updateApiKey = async (id: string, name: string) => {
-    const response = await fetch(`/api/api-keys/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
-    if (response.ok) {
+    try {
+      await apiClient.updateApiKey(id, name);
       await fetchApiKeys();
       return true;
+    } catch (error) {
+      console.error("Failed to update API key:", error);
+      throw new Error("Failed to update API key");
     }
-    throw new Error("Failed to update API key");
   };
 
   const deleteApiKey = async (id: string) => {
-    const response = await fetch(`/api/api-keys/${id}`, {
-      method: "DELETE",
-    });
-    if (response.ok) {
+    try {
+      await apiClient.deleteApiKey(id);
       await fetchApiKeys();
       return true;
+    } catch (error) {
+      console.error("Failed to delete API key:", error);
+      throw new Error("Failed to delete API key");
     }
-    throw new Error("Failed to delete API key");
   };
 
   return {

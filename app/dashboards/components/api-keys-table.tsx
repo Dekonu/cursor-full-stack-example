@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ApiKey } from "../types";
 import { maskKey } from "../utils";
+import { apiClient } from "@/lib/api-client";
 
 interface ApiKeysTableProps {
   apiKeys: ApiKey[];
@@ -189,16 +190,11 @@ export function ApiKeysTable({
                       onClick={async () => {
                         // Always fetch the full key from the API to ensure we get the actual key
                         try {
-                          const response = await fetch(`/api/api-keys/${key.id}/reveal`);
-                          if (response.ok) {
-                            const data = await response.json();
-                            if (data.key) {
-                              onCopy(data.key);
-                            } else {
-                              console.error("No key in response");
-                            }
+                          const data = await apiClient.revealApiKey(key.id);
+                          if (data.key) {
+                            onCopy(data.key);
                           } else {
-                            console.error("Failed to fetch full key:", response.statusText);
+                            console.error("No key in response");
                           }
                         } catch (error) {
                           console.error("Error fetching full key:", error);

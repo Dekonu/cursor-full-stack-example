@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Toast } from "../dashboards/components/toast";
 import { useToast } from "../dashboards/hooks/use-toast";
+import { apiClient } from "@/lib/api-client";
 
 function ProtectedContent() {
   const searchParams = useSearchParams();
@@ -32,15 +33,7 @@ function ProtectedContent() {
       }
 
       try {
-        const response = await fetch("/api/validate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ apiKey }),
-        });
-
-        const data = await response.json();
+        const data = await apiClient.validateApiKey(apiKey);
         const valid = data.valid === true;
 
         setIsValid(valid);
